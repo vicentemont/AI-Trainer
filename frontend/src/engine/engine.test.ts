@@ -84,3 +84,14 @@ describe("api (browser engine)", () => {
     expect(JSON.stringify(localStorage)).not.toContain("pw\"");
   });
 });
+
+import { describeStep, fmtStepTime } from "../plan-utils";
+describe("step time formatting", () => {
+  it("never rounds short steps down to 0 min", () => {
+    expect(fmtStepTime(20)).toBe("20 s");
+    expect(fmtStepTime(90)).toBe("1 min 30 s");
+    expect(fmtStepTime(720)).toBe("12 min");
+    expect(fmtStepTime(3900)).toBe("1h05");
+    expect(describeStep({ kind: "active", duration_type: "time", duration_value: 20, target_type: "none", target_low: null, target_high: null, repeat: 1, notes: null, why: null })).toBe("20 s");
+  });
+});

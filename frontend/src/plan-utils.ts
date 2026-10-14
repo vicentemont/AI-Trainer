@@ -43,11 +43,22 @@ export function fmtDuration(sec: number): string {
   const h = Math.floor(m / 60);
   return `${h}h${String(m % 60).padStart(2, "0")}`;
 }
+/** Exact step length: "20 s", "1 min 30 s", "12 min", "1h05". Totals still use the rounded fmtDuration. */
+export function fmtStepTime(sec: number): string {
+  const total = Math.round(sec);
+  if (total < 60) return `${total} s`;
+  if (total < 3600) {
+    const m = Math.floor(total / 60), r = total % 60;
+    return r ? `${m} min ${r} s` : `${m} min`;
+  }
+  const h = Math.floor(total / 3600), m = Math.round((total % 3600) / 60);
+  return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
+}
 export const fmtKm = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${Math.round(m)} m`);
 const pace = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}/km`;
 
 export function describeStep(s: Step): string {
-  const dur = s.duration_type === "time" && s.duration_value ? fmtDuration(s.duration_value)
+  const dur = s.duration_type === "time" && s.duration_value ? fmtStepTime(s.duration_value)
     : s.duration_type === "distance" && s.duration_value ? fmtKm(s.duration_value) : "Until lap press";
   const hi = s.target_high ?? s.target_low;
   let target = "";

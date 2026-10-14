@@ -16,7 +16,7 @@ from fit_tool.profile.profile_type import (
     Sport as FitSport,
 )
 
-from ..models import Sport, Step, Workout
+from ..models import Sport, Step, Workout, flatten
 
 _SPORT = {
     Sport.RUNNING: FitSport.RUNNING,
@@ -86,9 +86,7 @@ def _step_message(step: Step, index: int) -> WorkoutStepMessage:
 
 def workout_to_fit(workout: Workout) -> bytes:
     """Return the bytes of a FIT workout file (repeats are expanded into plain steps)."""
-    expanded: list[Step] = []
-    for s in workout.steps:
-        expanded.extend([s] * s.repeat)
+    expanded = flatten(workout.steps)
 
     builder = FitFileBuilder(auto_define=True, min_string_size=50)
     fid = FileIdMessage()

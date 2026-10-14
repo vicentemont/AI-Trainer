@@ -1,0 +1,5 @@
+frontend/node_modules
+.venv
+tests
+.pytest_cache
+.ruff_cache

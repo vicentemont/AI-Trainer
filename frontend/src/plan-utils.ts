@@ -1,4 +1,4 @@
-import type { Plan, SportKey, Step, Workout } from "./types";
+import { isBlock, type Plan, type SportKey, type Step, type Workout } from "./types";
 
 export const SPORT: Record<SportKey, { label: string; color: string; icon: string }> = {
   running: { label: "Run", color: "var(--run)", icon: "M13 4a2 2 0 100-4 2 2 0 000 4zM9 22l2-7-3-3 2-5 3 2 3 1M7 12l-3 1M10 7l4 1" },
@@ -25,8 +25,17 @@ function stepMeters(s: Step, sport: SportKey): number {
   }
   return 0;
 }
-export const workoutSeconds = (w: Workout) => w.steps.reduce((a, s) => a + stepSeconds(s, w.sport) * s.repeat, 0);
-export const workoutMeters = (w: Workout) => w.steps.reduce((a, s) => a + stepMeters(s, w.sport) * s.repeat, 0);
+/** The plain sequence of steps actually performed, with repeats expanded. */
+export function flattenSteps(items: Workout["steps"]): Step[] {
+  const out: Step[] = [];
+  for (const it of items) {
+    if (isBlock(it)) for (let r = 0; r < it.repeat; r++) for (const s of it.steps) for (let k = 0; k < s.repeat; k++) out.push(s);
+    else for (let k = 0; k < it.repeat; k++) out.push(it);
+  }
+  return out;
+}
+export const workoutSeconds = (w: Workout) => flattenSteps(w.steps).reduce((a, s) => a + stepSeconds(s, w.sport), 0);
+export const workoutMeters = (w: Workout) => flattenSteps(w.steps).reduce((a, s) => a + stepMeters(s, w.sport), 0);
 
 export function fmtDuration(sec: number): string {
   const m = Math.round(sec / 60);

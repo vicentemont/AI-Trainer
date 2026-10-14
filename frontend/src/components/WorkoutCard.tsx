@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { Workout } from "../types";
-import { INTENSITY, SPORT, describeStep, fmtDuration, fmtKm, workoutMeters, workoutSeconds } from "../plan-utils";
+import { isBlock, type Step, type Workout } from "../types";
+import { INTENSITY, SPORT, describeStep, flattenSteps, fmtDuration, fmtKm, workoutMeters, workoutSeconds } from "../plan-utils";
 
 interface Props { w: Workout; selected: boolean; onToggle: () => void; delay: number }
 
-const weight = (s: Workout["steps"][number]) =>
+const weight = (s: Step) =>
   Math.max(s.duration_value ? (s.duration_type === "time" ? s.duration_value : s.duration_value * 0.36) : 60, 30);
 
 export default function WorkoutCard({ w, selected, onToggle, delay }: Props) {
@@ -13,9 +13,9 @@ export default function WorkoutCard({ w, selected, onToggle, delay }: Props) {
   const sport = SPORT[w.sport];
   const d = w.scheduled_for ? new Date(w.scheduled_for + "T00:00:00") : null;
   const sec = workoutSeconds(w), m = workoutMeters(w);
-  const expanded = w.steps.flatMap((s) => Array.from({ length: s.repeat }, () => s));
+  const expanded = flattenSteps(w.steps);
   const total = expanded.reduce((a, s) => a + weight(s), 0);
-  const kinds = [...new Set(w.steps.map((s) => s.kind))];
+  const kinds = [...new Set(expanded.map((s) => s.kind))];
 
   return (
     <motion.article className={`card ${selected ? "" : "off"} ${open ? "open" : ""}`} style={{ ["--c" as string]: sport.color }}
@@ -52,20 +52,29 @@ export default function WorkoutCard({ w, selected, onToggle, delay }: Props) {
               </div>
               <div className="legend">{kinds.map((k) => <span key={k}><i style={{ background: INTENSITY[k].color }} />{INTENSITY[k].label}</span>)}</div>
               <ol className="steps">
-                {w.steps.map((s, i) => (
-                  <li key={i}>
-                    <i style={{ background: INTENSITY[s.kind].color }} />
-                    <div>
-                      <div className="step-top"><em>{INTENSITY[s.kind].label}</em><span>{describeStep(s)}</span></div>
-                      {(s.why || s.notes) && <p className="step-why">{s.why ?? s.notes}</p>}
-                    </div>
+                {w.steps.map((item, i) => isBlock(item) ? (
+                  <li key={i} className="block">
+                    <div className="block-head">Repeat {item.repeat}×</div>
+                    <ol>{item.steps.map((s, j) => <StepRow key={j} s={s} />)}</ol>
                   </li>
-                ))}
+                ) : <StepRow key={i} s={item} />)}
               </ol>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
     </motion.article>
+  );
+}
+
+function StepRow({ s }: { s: Step }) {
+  return (
+    <li>
+      <i style={{ background: INTENSITY[s.kind].color }} />
+      <div>
+        <div className="step-top"><em>{INTENSITY[s.kind].label}</em><span>{describeStep(s)}</span></div>
+        {(s.why || s.notes) && <p className="step-why">{s.why ?? s.notes}</p>}
+      </div>
+    </li>
   );
 }

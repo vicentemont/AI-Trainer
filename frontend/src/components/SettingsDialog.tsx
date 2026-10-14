@@ -25,7 +25,7 @@ export default function SettingsDialog({ state, onClose, onSaved, onError }: Pro
     <motion.div className="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
       <motion.div className="dialog" initial={{ y: 20, scale: 0.97 }} animate={{ y: 0, scale: 1 }} onClick={(e) => e.stopPropagation()}>
         <h3>Choose your AI</h3>
-        <p className="sub">Use your own key. It's stored in this computer's keychain and only sent to the provider you pick.</p>
+        <p className="sub">Use your own key. It stays in this browser and is only sent to the provider you pick. Anyone using this device could see it, so avoid shared computers.</p>
         <div className="seg">{PROVIDERS.map((p) => <button key={p.id} className={p.id === provider ? "on" : ""} onClick={() => setProvider(p.id)}>{p.label}{state.saved_providers.includes(p.id) ? " ✓" : ""}</button>)}</div>
         <div className="field">
           <label>API key {has && <span style={{ fontWeight: 400, color: "var(--muted)" }}>— saved, leave empty to keep</span>}</label>

@@ -13,6 +13,21 @@ export interface Step {
   notes: string | null;
   why: string | null;
 }
+export interface RepeatBlock {
+  repeat: number;
+  steps: Step[];
+}
+export const isBlock = (x: Step | RepeatBlock): x is RepeatBlock => Array.isArray((x as RepeatBlock).steps);
+
+export interface Activity {
+  sport: string;
+  start_time: string | null;
+  duration_s: number;
+  distance_m: number;
+  avg_hr: number | null;
+  max_hr: number | null;
+  source_file: string | null;
+}
 export interface Workout {
   name: string;
   sport: SportKey;
@@ -20,7 +35,7 @@ export interface Workout {
   week: number | null;
   description: string | null;
   why: string | null;
-  steps: Step[];
+  steps: (Step | RepeatBlock)[];
 }
 export interface Phase { name: string; start_week: number; end_week: number; focus: string; why: string }
 export interface WeekOutline {

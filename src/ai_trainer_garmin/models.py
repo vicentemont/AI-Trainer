@@ -1,33 +1,21 @@
-"""Internal, provider-neutral data models shared by the LLM, FIT and delivery layers."""
+"""Workout models shared by the FIT writer and the Garmin Connect converter.
+
+The browser app owns planning and sends finished workouts here as JSON.
+"""
 from __future__ import annotations
 
-from datetime import date, datetime
-from enum import Enum
+from datetime import date
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
-class Sport(str, Enum):
+class Sport(StrEnum):
     RUNNING = "running"
     CYCLING = "cycling"
     SWIMMING = "swimming"
     STRENGTH = "strength"
-
-
-class Activity(BaseModel):
-    """Summary of one completed activity parsed from a .fit file."""
-
-    sport: str
-    start_time: datetime | None = None
-    duration_s: float = 0
-    distance_m: float = 0
-    avg_hr: int | None = None
-    max_hr: int | None = None
-    avg_power_w: int | None = None
-    total_ascent_m: int | None = None
-    calories: int | None = None
-    source_file: str | None = None
 
 
 class Step(BaseModel):
@@ -40,58 +28,35 @@ class Step(BaseModel):
     target_low: float | None = Field(None, description="pace in s/km; others in native units")
     target_high: float | None = None
     repeat: int = Field(1, ge=1, description="Repeat this step N times (simple intervals)")
-    notes: str | None = Field(None, description="Very short cue shown on the watch (max 50 chars)")
-    why: str | None = Field(None, description="One sentence: purpose/benefit of this step. Required on key work steps")
+    notes: str | None = None
+    why: str | None = None
+
+
+class RepeatBlock(BaseModel):
+    """Several steps repeated together, e.g. 4 x (400 m fast + 90 s jog)."""
+
+    repeat: int = Field(..., ge=2)
+    steps: list[Step] = Field(..., min_length=1)
+
+
+def flatten(items: list[RepeatBlock | Step]) -> list[Step]:
+    """Expand repeats into the plain sequence of steps actually performed."""
+    out: list[Step] = []
+    for it in items:
+        if isinstance(it, RepeatBlock):
+            for _round in range(it.repeat):
+                for step in it.steps:
+                    out.extend([step] * step.repeat)
+        else:
+            out.extend([it] * it.repeat)
+    return out
 
 
 class Workout(BaseModel):
     name: str = Field(..., max_length=60)
     sport: Sport
     scheduled_for: date | None = None
-    week: int | None = Field(None, description="Set by the app; do not output")
-    description: str | None = Field(None, description="What the session is, 1 sentence")
-    why: str | None = Field(None, description="2-3 sentences: why this session is here and its physiological benefit")
-    steps: list[Step] = Field(..., min_length=1)
-
-
-class WeekWorkouts(BaseModel):
-    """LLM output when designing a single week."""
-
-    workouts: list[Workout]
-
-
-class Phase(BaseModel):
-    name: str = Field(..., description="e.g. Base, Build, Peak, Taper")
-    start_week: int = Field(..., ge=1)
-    end_week: int = Field(..., ge=1)
-    focus: str
-    why: str = Field(..., description="Why this phase exists and what it achieves")
-
-
-class WeekOutline(BaseModel):
-    week: int = Field(..., ge=1)
-    theme: str = Field(..., description="Short title, e.g. 'Aerobic base + first hill work'")
-    why: str | None = Field(None, description="1-2 sentences on this week's role in the plan")
-    target_hours: float = Field(..., ge=0)
-    load: Literal["recovery", "easy", "moderate", "hard", "peak"] = "moderate"
-    status: Literal["pending", "done", "error"] = "pending"
-    error: str | None = None
-
-
-class PlanOutline(BaseModel):
-    """High-level periodization the coach commits to before workouts are generated."""
-
-    title: str
-    rationale: str = Field(..., description="Why the plan is structured this way, 3-5 sentences")
-    start_date: date
-    phases: list[Phase] = Field(..., min_length=1)
-    weeks: list[WeekOutline] = Field(..., min_length=1)
-
-
-class Plan(BaseModel):
-    title: str
-    rationale: str | None = None
-    start_date: date | None = None
-    phases: list[Phase] = Field(default_factory=list)
-    weeks: list[WeekOutline] = Field(default_factory=list)
-    workouts: list[Workout] = Field(default_factory=list)
+    week: int | None = None
+    description: str | None = None
+    why: str | None = None
+    steps: list[RepeatBlock | Step] = Field(..., min_length=1)

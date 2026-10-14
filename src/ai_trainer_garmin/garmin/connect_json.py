@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models import Sport, Step, Workout
+from ..models import RepeatBlock, Sport, Step, Workout, flatten
 
 # (id, key, displayOrder) triples; ids/keys come from Garmin's /workout-service/workout/types
 _SPORT = {
@@ -50,7 +50,7 @@ def _executable(step: Step, order: int) -> dict[str, Any]:
 def estimated_seconds(workout: Workout) -> int:
     """Rough duration; Garmin uses it to list and sync the workout. Distance steps use a pace guess."""
     total = 0.0
-    for s in workout.steps:
+    for s in flatten(workout.steps):
         v = s.duration_value or 0
         if s.duration_type == "distance":
             pace = {"running": 360, "cycling": 120, "swimming": 1500}.get(workout.sport.value, 360)
@@ -59,29 +59,41 @@ def estimated_seconds(workout: Workout) -> int:
             v = v / 1000 * pace
         elif s.duration_type == "open":
             v = 300
-        total += v * s.repeat
+        total += v
     return max(int(total), 60)
 
 
 def workout_to_connect_json(workout: Workout) -> dict[str, Any]:
     steps: list[dict[str, Any]] = []
     order = 1
-    for s in workout.steps:
-        if s.repeat > 1:
-            child = _executable(s, order + 1)
-            steps.append({
-                "type": "RepeatGroupDTO", "stepOrder": order,
-                "stepType": {"stepTypeId": 6, "stepTypeKey": "repeat", "displayOrder": 6},
-                "numberOfIterations": s.repeat,
-                "smartRepeat": False,
-                "endCondition": {"conditionTypeId": 7, "conditionTypeKey": "iterations", "displayOrder": 7,
-                                 "displayable": False},
-                "endConditionValue": float(s.repeat),
-                "workoutSteps": [child],
-            })
-            order += 2
+
+    def group(iterations: int, children: list[Step]) -> dict[str, Any]:
+        nonlocal order
+        g_order = order
+        order += 1
+        kids = []
+        for child in children:
+            d = _executable(child, order)
+            d["childStepId"] = 1
+            kids.append(d)
+            order += 1
+        return {
+            "type": "RepeatGroupDTO", "stepOrder": g_order,
+            "stepType": {"stepTypeId": 6, "stepTypeKey": "repeat", "displayOrder": 6},
+            "numberOfIterations": iterations, "smartRepeat": False,
+            "endCondition": {"conditionTypeId": 7, "conditionTypeKey": "iterations", "displayOrder": 7,
+                             "displayable": False},
+            "endConditionValue": float(iterations),
+            "workoutSteps": kids,
+        }
+
+    for item in workout.steps:
+        if isinstance(item, RepeatBlock):
+            steps.append(group(item.repeat, item.steps))
+        elif item.repeat > 1:
+            steps.append(group(item.repeat, [item]))
         else:
-            steps.append(_executable(s, order))
+            steps.append(_executable(item, order))
             order += 1
     sid, skey, sord = _SPORT[workout.sport]
     sport = {"sportTypeId": sid, "sportTypeKey": skey, "displayOrder": sord}
